@@ -125,15 +125,15 @@ Shader "Moonstorm/FX/MSColorRampScroll"
                 }
                 float3 L = normalize(UnityWorldSpaceLightDir(i.wPos));
                 float attenuation = LIGHT_ATTENUATION(i);
-                float3 lambertian = saturate(dot(N, L));
-                float3 diffuse = step(_DiffuseThreshold, lambertian * _LightColor0.xyz) * _DiffusePower * attenuation;
+                float3 lambertian = saturate(dot(N, L)) * attenuation;
+                float3 diffuse = step(_DiffuseThreshold, lambertian ) * _DiffusePower * _LightColor0.xyz;
 
                 //Speculars
                 float3 V = normalize(_WorldSpaceCameraPos - i.wPos);
                 float3 H = normalize (L + V);
                 float specularExponent = exp2(_Gloss * _SpecularExponent) + 1;
                 float3 specularLight = saturate(dot(H, N)) * (lambertian > 0);
-                specularLight = pow(specularLight, specularExponent) * _Gloss * attenuation * _LightColor0.xyz;
+                specularLight = pow(specularLight, specularExponent) * _Gloss * _LightColor0.xyz;
                 specularLight = step(0.7, specularLight) * _SpecularPower + step(0.7 * _SpecularOuterBandThreshold , specularLight) * _SpecularPower * (0.334);
                 
                 float fresnelSamplePosition = (-dot(i.local_space.xyz, _ScrollVector.xyz) + _FresnelRamp_ST.z) * _FresnelRamp_ST.x;
@@ -225,16 +225,16 @@ Shader "Moonstorm/FX/MSColorRampScroll"
                     N = normalize(i.normal);
                 }
                 float3 L = normalize(UnityWorldSpaceLightDir(i.wPos));
-                float attenuation = LIGHT_ATTENUATION(i);
-                float3 lambertian = saturate(dot(N, L));
-                float3 diffuse = step(_DiffuseThreshold , lambertian) * _DiffusePower * _LightColor0.xyz * attenuation;
+                UNITY_LIGHT_ATTENUATION(attenuation, i, i.wPos.xyz);
+                float3 lambertian = saturate(dot(N, L))  * attenuation;
+                float3 diffuse = step(_DiffuseThreshold , lambertian) * _DiffusePower * _LightColor0.xyz;
 
                 //Speculars
                 float3 V = normalize(_WorldSpaceCameraPos - i.wPos);
                 float3 H = normalize (L + V);
                 float specularExponent = exp2(_Gloss * _SpecularExponent) + 1;
                 float3 specularLight = saturate(dot(H, N)) * (lambertian > 0);
-                specularLight = pow(specularLight, specularExponent) * _Gloss * attenuation * _LightColor0.xyz;
+                specularLight = pow(specularLight, specularExponent) * _Gloss * _LightColor0.xyz;
                 specularLight = step(0.7, specularLight) * _SpecularPower + step(0.7 * _SpecularOuterBandThreshold , specularLight) * _SpecularPower * (0.334);
                 
                 return float4(diffuse * _Tint + specularLight  , 1);
