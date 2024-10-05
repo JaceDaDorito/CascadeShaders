@@ -12,7 +12,7 @@ Shader "Moonstorm/FX/MSColorRampScroll"
         _Gloss ("Gloss: ", Range(0,1)) = 1
         _SpecularExponent ("Specular Exponent: ", Float) = 6
         _SpecularOuterBandThreshold ("Specular Outer Band Threshold: ", Range(0,1)) = 0.7
-        _SpecularPower ("Specular Power: ", Range(0,3)) = 0.4
+        _SpecularPower ("Specular Power: ", Range(0,3)) = 0.5
 
         _DiffuseThreshold ("Diffuse Threshold: ", Range(0,1)) = 0.9
         _DiffusePower ("Diffuse Power: ", Range(0,1)) = 0.2
@@ -38,9 +38,8 @@ Shader "Moonstorm/FX/MSColorRampScroll"
             #include "UnityCG.cginc"
             #include "Lighting.cginc"
             #include "AutoLight.cginc"
-            #include "UnityCG.cginc"
-            #include "Lighting.cginc"
-            #include "AutoLight.cginc"
+
+            #define SPECULAR_OUTER_BAND_CONST 0.667
 
             struct appdata
             {
@@ -59,7 +58,6 @@ Shader "Moonstorm/FX/MSColorRampScroll"
                 float3 bitangent : TEXCOORD3;
                 float4 local_space : TEXCOORD4;
                 float3 wPos : TEXCOORD5;
-                LIGHTING_COORDS(6,7)
             };
 
             fixed4 _Tint;
@@ -100,7 +98,6 @@ Shader "Moonstorm/FX/MSColorRampScroll"
                 o.bitangent = cross(o.normal, o.tangent) * (v.tangent.w * unity_WorldTransformParams.w);
                 o.local_space = v.vertex;
                 o.wPos = mul(unity_ObjectToWorld, v.vertex);
-                TRANSFER_VERTEX_TO_FRAGMENT(o);
                 return o;
             }
 
@@ -124,8 +121,7 @@ Shader "Moonstorm/FX/MSColorRampScroll"
                     N = normalize(i.normal.xyz);
                 }
                 float3 L = normalize(UnityWorldSpaceLightDir(i.wPos));
-                float attenuation = LIGHT_ATTENUATION(i);
-                float3 lambertian = saturate(dot(N, L)) * attenuation;
+                float3 lambertian = saturate(dot(N, L));
                 float3 diffuse = step(_DiffuseThreshold, lambertian ) * _DiffusePower * _LightColor0.xyz;
 
                 //Speculars
@@ -133,8 +129,8 @@ Shader "Moonstorm/FX/MSColorRampScroll"
                 float3 H = normalize (L + V);
                 float specularExponent = exp2(_Gloss * _SpecularExponent) + 1;
                 float3 specularLight = saturate(dot(H, N)) * (lambertian > 0);
-                specularLight = pow(specularLight, specularExponent) * _Gloss * _LightColor0.xyz;
-                specularLight = step(0.7, specularLight) * _SpecularPower + step(0.7 * _SpecularOuterBandThreshold , specularLight) * _SpecularPower * (0.334);
+                specularLight = pow(specularLight, specularExponent) * _Gloss;
+                specularLight = step(0.7, specularLight) * _SpecularPower + step(0.7 * _SpecularOuterBandThreshold , specularLight) * _SpecularPower * _LightColor0.xyz * SPECULAR_OUTER_BAND_CONST;
                 
                 float fresnelSamplePosition = (-dot(i.local_space.xyz, _ScrollVector.xyz) + _FresnelRamp_ST.z) * _FresnelRamp_ST.x;
                 float fresnelFactor = 1 - step(_FresnelThreshold, dot(V, N));
@@ -154,10 +150,12 @@ Shader "Moonstorm/FX/MSColorRampScroll"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma multi_compile_fwadd
+            #pragma multi_compile_fwdadd
             #include "UnityCG.cginc"
             #include "Lighting.cginc"
             #include "AutoLight.cginc"
+
+            #define SPECULAR_OUTER_BAND_CONST 0.667
 
             struct appdata
             {
@@ -169,14 +167,14 @@ Shader "Moonstorm/FX/MSColorRampScroll"
 
             struct v2f
             {
+                
                 float4 vertex : SV_POSITION;
                 float2 uv : TEXCOORD0;
                 float3 normal : TEXCOORD1;
                 float3 tangent : TEXCOORD2;
                 float3 bitangent : TEXCOORD3;
-                float4 local_space : TEXCOORD4;
-                float3 wPos : TEXCOORD5;
-                LIGHTING_COORDS(6,7)
+                float3 wPos : TEXCOORD4;
+                LIGHTING_COORDS(5,6)
             };
 
             fixed4 _Tint;
@@ -202,7 +200,6 @@ Shader "Moonstorm/FX/MSColorRampScroll"
                 o.normal = v.normal;
                 o.tangent = v.tangent;
                 o.bitangent = cross(o.normal, o.tangent) * (v.tangent.w * unity_WorldTransformParams.w);
-                o.local_space = v.vertex;
                 o.wPos = mul(unity_ObjectToWorld, v.vertex);
                 TRANSFER_VERTEX_TO_FRAGMENT(o);
                 return o;
@@ -225,17 +222,17 @@ Shader "Moonstorm/FX/MSColorRampScroll"
                     N = normalize(i.normal);
                 }
                 float3 L = normalize(UnityWorldSpaceLightDir(i.wPos));
-                UNITY_LIGHT_ATTENUATION(attenuation, i, i.wPos.xyz);
-                float3 lambertian = saturate(dot(N, L))  * attenuation;
-                float3 diffuse = step(_DiffuseThreshold , lambertian) * _DiffusePower * _LightColor0.xyz;
+                float attenuation = LIGHT_ATTENUATION(i);
+                float3 lambertian = saturate(dot(N, L));
+                float3 diffuse = step(_DiffuseThreshold , lambertian * attenuation )  * _DiffusePower * _LightColor0.xyz;
 
                 //Speculars
                 float3 V = normalize(_WorldSpaceCameraPos - i.wPos);
                 float3 H = normalize (L + V);
                 float specularExponent = exp2(_Gloss * _SpecularExponent) + 1;
                 float3 specularLight = saturate(dot(H, N)) * (lambertian > 0);
-                specularLight = pow(specularLight, specularExponent) * _Gloss * _LightColor0.xyz;
-                specularLight = step(0.7, specularLight) * _SpecularPower + step(0.7 * _SpecularOuterBandThreshold , specularLight) * _SpecularPower * (0.334);
+                specularLight = pow(specularLight, specularExponent) * _Gloss * attenuation;
+                specularLight = step(0.7, specularLight) * _SpecularPower + step(0.7 * _SpecularOuterBandThreshold , specularLight) * _SpecularPower * _LightColor0.xyz * SPECULAR_OUTER_BAND_CONST;
                 
                 return float4(diffuse * _Tint + specularLight  , 1);
             }
